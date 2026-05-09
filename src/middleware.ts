@@ -26,9 +26,12 @@ export async function middleware(request: NextRequest) {
   const pathname = request.nextUrl.pathname;
 
   const isAuthPage = pathname.startsWith("/login");
+
   const isBuyerPage = pathname.startsWith("/buyer");
 
-  if (isBuyerPage && !user) {
+  const isSellerPage = pathname.startsWith("/seller");
+
+  if ((isBuyerPage || isSellerPage) && !user) {
     return NextResponse.redirect(new URL("/login", request.url));
   }
 
@@ -40,5 +43,5 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/buyer/:path*", "/login"],
+  matcher: ["/buyer/:path*", "/seller/:path*", "/login"],
 };

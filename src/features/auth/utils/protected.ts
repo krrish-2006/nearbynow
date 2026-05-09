@@ -8,9 +8,5 @@ export async function requireBuyer() {
     redirect("/login");
   }
 
-  if (profile.role !== "buyer") {
-    redirect("/");
-  }
-
   return profile;
 }

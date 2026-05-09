@@ -1,14 +1,13 @@
-import SearchBar from "@/components/shared/search-bar";
 import LogoutButton from "@/features/auth/components/logout-button";
-import { getCurrentUser } from "@/features/auth/utils/auth";
-import { redirect } from "next/navigation";
+import { requireBuyer } from "@/features/auth/utils/protected";
+import SearchBar from "@/components/shared/search-bar";
+import BecomeSellerButton from "@/features/seller/components/become-seller-button";
+import PortalSwitcher from "@/features/seller/components/portal-switcher";
 
 export default async function BuyerPage() {
-  const user = await getCurrentUser();
+  const profile = await requireBuyer();
 
-  if (!user) {
-    redirect("/login");
-  }
+  const isSeller = profile.role === "seller";
 
   return (
     <main className="min-h-screen bg-neutral-100">
@@ -16,13 +15,23 @@ export default async function BuyerPage() {
         <div className="mb-8 flex items-center justify-between">
           <div>
             <h1 className="text-3xl font-bold">
-              Welcome, {user.user_metadata.full_name}
+              Welcome, {profile.full_name}
             </h1>
 
-            <p className="mt-1 text-neutral-600">Find products near you</p>
+            <p className="mt-1 text-neutral-600">
+              Find products near you
+            </p>
           </div>
 
           <LogoutButton />
+        </div>
+
+        <div className="mb-8">
+          {isSeller ? (
+            <PortalSwitcher />
+          ) : (
+            <BecomeSellerButton />
+          )}
         </div>
 
         <SearchBar />
