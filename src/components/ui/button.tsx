@@ -1,12 +1,8 @@
 import { ButtonHTMLAttributes } from "react";
 
-type Variant =
-  | "primary"
-  | "secondary"
-  | "danger";
+type Variant = "primary" | "secondary" | "danger";
 
-interface Props
-  extends ButtonHTMLAttributes<HTMLButtonElement> {
+interface Props extends ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: Variant;
 }
 
@@ -17,17 +13,16 @@ export default function Button({
   ...props
 }: Props) {
   const baseStyles =
-    "cursor-pointer rounded-2xl px-6 py-3 font-semibold transition-all duration-200 active:scale-95 disabled:opacity-50";
+    "inline-flex h-14 items-center justify-center rounded-2xl px-6 text-lg font-semibold transition-all duration-200 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50";
 
   const variants = {
-    primary:
-      "bg-black text-white shadow-md hover:scale-[1.03] hover:shadow-xl",
+    primary: "bg-black text-white shadow-md hover:scale-[1.02] hover:shadow-xl",
 
     secondary:
-      "border bg-white shadow-sm hover:scale-[1.03] hover:bg-neutral-100 hover:shadow-lg",
+      "border bg-white shadow-sm hover:scale-[1.02] hover:bg-neutral-100 hover:shadow-lg",
 
     danger:
-      "border-2 border-red-500 bg-red-100 text-red-600 shadow-sm hover:scale-[1.03] hover:bg-red-600 hover:text-white hover:shadow-xl",
+      "border-2 border-red-500 bg-red-100 text-red-600 shadow-sm hover:scale-[1.02] hover:bg-red-600 hover:text-white hover:shadow-xl",
   };
 
   return (

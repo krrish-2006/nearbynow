@@ -2,6 +2,7 @@ import Image from "next/image";
 import Link from "next/link";
 
 import { createClient } from "@/lib/supabase/server";
+import ProductCard from "@/features/products/components/product-card";
 
 export default async function ProductsPage() {
   const supabase: any = await createClient();
@@ -46,51 +47,11 @@ export default async function ProductsPage() {
       ) : (
         <div className="grid gap-8 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
           {products.map((product: any) => (
-            <Link
-              key={product.id}
-              href={`/products/${product.id}`}
-              className="overflow-hidden rounded-3xl border bg-white transition hover:-translate-y-1 hover:shadow-xl"
-            >
-              <div className="relative h-72 w-full bg-neutral-100">
-                {product.image_url ? (
-                  <Image
-                    src={product.image_url}
-                    alt={product.title}
-                    fill
-                    className="object-cover"
-                  />
-                ) : (
-                  <div className="flex h-full items-center justify-center text-sm text-neutral-400">
-                    No Image
-                  </div>
-                )}
-              </div>
-
-              <div className="space-y-3 p-5">
-                <div>
-                  <h2 className="line-clamp-1 text-xl font-bold">
-                    {product.title}
-                  </h2>
-
-                  <p className="mt-1 text-sm text-neutral-500">
-                    by{" "}
-                    {product.shops?.name ??
-                      "Unknown Shop"}
-                  </p>
-                </div>
-
-                <div className="flex items-center justify-between">
-                  <p className="text-lg font-bold">
-                    ? {product.price}
-                  </p>
-
-                  <span className="rounded-full bg-black px-4 py-2 text-xs font-semibold text-white">
-                    View
-                  </span>
-                </div>
-              </div>
-            </Link>
-          ))}
+  <ProductCard
+    key={product.id}
+    product={product}
+  />
+))}
         </div>
       )}
     </main>

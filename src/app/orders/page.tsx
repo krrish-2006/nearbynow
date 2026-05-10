@@ -3,6 +3,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { createClient } from "@/lib/supabase/server";
+import EmptyState from "@/components/shared/empty-state";
 
 export default async function OrdersPage() {
   const supabase: any =
@@ -49,22 +50,12 @@ export default async function OrdersPage() {
 
       {!orders ||
       orders.length === 0 ? (
-        <div className="rounded-3xl border bg-white p-16 text-center">
-          <h2 className="text-2xl font-bold">
-            No orders yet
-          </h2>
-
-          <p className="mt-2 text-neutral-500">
-            Start shopping to place your first order.
-          </p>
-
-          <Link
-            href="/"
-            className="mt-6 inline-flex rounded-2xl bg-black px-6 py-3 text-white"
-          >
-            Browse Products
-          </Link>
-        </div>
+        <EmptyState
+  title="No orders yet"
+  description="Start shopping to place your first order."
+  buttonText="Browse Products"
+  buttonHref="/"
+/>
       ) : (
         <div className="space-y-8">
           {orders.map(

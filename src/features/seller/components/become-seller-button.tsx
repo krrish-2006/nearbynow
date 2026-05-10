@@ -1,6 +1,7 @@
 "use client";
 
 import { useTransition } from "react";
+
 import { useRouter } from "next/navigation";
 
 export default function BecomeSellerButton() {
@@ -15,8 +16,9 @@ export default function BecomeSellerButton() {
 
     if (response.ok) {
       startTransition(() => {
-        router.push("/seller");
         router.refresh();
+
+        window.location.href = "/seller";
       });
     }
   }
@@ -25,11 +27,9 @@ export default function BecomeSellerButton() {
     <button
       onClick={handleBecomeSeller}
       disabled={isPending}
-      className="rounded-xl bg-black px-5 py-3 text-white transition hover:bg-neutral-800 disabled:opacity-50"
+      className="flex h-11 items-center justify-center rounded-full bg-black px-5 text-sm font-semibold text-white transition hover:bg-neutral-800 disabled:opacity-50"
     >
-      {isPending
-        ? "Upgrading..."
-        : "Become a Seller"}
+      {isPending ? "Upgrading..." : "Become a Seller"}
     </button>
   );
 }

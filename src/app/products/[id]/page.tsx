@@ -2,9 +2,14 @@ import Image from "next/image";
 
 import { notFound } from "next/navigation";
 
+import Link from "next/link";
+
+import Button from "@/components/ui/button";
+
 import { createClient } from "@/lib/supabase/server";
 
-import AddToCartButton from "@/features/cart/components/add-to-cart-button";
+import BuyNowButton from "@/features/checkout/components/buy-now-button";
+import ProductCard from "@/features/products/components/product-card";
 
 export default async function ProductDetailsPage({
   params,
@@ -39,15 +44,22 @@ export default async function ProductDetailsPage({
     notFound();
   }
 
+  const { data: existingCartItem } = await supabase
+    .from("cart_items")
+    .select("id")
+    .eq("product_id", product.id)
+    .limit(1)
+    .maybeSingle();
+
   const { data: relatedProducts } = await supabase
     .from("products")
     .select(
       `
-      id,
-      title,
-      price,
-      image_url
-    `,
+        id,
+        title,
+        price,
+        image_url
+      `,
     )
     .eq("category_id", product.category_id)
     .neq("id", product.id)
@@ -89,7 +101,7 @@ export default async function ProductDetailsPage({
               </div>
 
               <div>
-                <h1 className="text-4xl font-black tracking-tight sm:text-5xl">
+                <h1 className="text-3xl font-black leading-tight tracking-tight sm:text-5xl">
                   {product.title}
                 </h1>
 
@@ -99,107 +111,63 @@ export default async function ProductDetailsPage({
               </div>
 
               <div>
-                <p className="text-4xl font-black sm:text-5xl">
-                  ₹ {product.price}
+                <p className="text-3xl font-black sm:text-5xl">
+                  â‚¹ {product.price}
                 </p>
 
-                <p className="mt-2 text-sm font-medium text-green-600">
-                  Available for local pickup
+                <p className="mt-2 text-sm text-neutral-500">
+                  Inclusive of all taxes
                 </p>
-              </div>
-            </div>
-
-            <div className="rounded-3xl border bg-white p-5 shadow-sm sm:p-6">
-              <p className="text-sm text-neutral-500">Sold by</p>
-
-              <h2 className="mt-2 text-2xl font-bold">{product.shops?.name}</h2>
-
-              <p className="mt-3 text-sm leading-relaxed text-neutral-600">
-                {product.shops?.description}
-              </p>
-            </div>
-
-            <div>
-              <AddToCartButton productId={product.id} />
-            </div>
-
-            <div className="grid gap-4 sm:grid-cols-3">
-              <div className="rounded-3xl border bg-white p-5 shadow-sm">
-                <h3 className="text-sm font-semibold text-neutral-500">
-                  Payment
-                </h3>
-
-                <p className="mt-3 text-lg font-bold">COD / Pay at Store</p>
               </div>
 
               <div className="rounded-3xl border bg-white p-5 shadow-sm">
-                <h3 className="text-sm font-semibold text-neutral-500">
-                  Pickup
-                </h3>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm text-neutral-500">Sold by</p>
 
-                <p className="mt-3 text-lg font-bold">Local Shop Pickup</p>
+                    <h2 className="mt-1 text-xl font-bold">
+                      {product.shops?.name}
+                    </h2>
+                  </div>
+
+                  <div className="rounded-full bg-green-100 px-4 py-2 text-sm font-semibold text-green-700">
+                    Available
+                  </div>
+                </div>
               </div>
 
-              <div className="rounded-3xl border bg-white p-5 shadow-sm">
-                <h3 className="text-sm font-semibold text-neutral-500">
-                  Category
-                </h3>
+              <div className="grid grid-cols-2 gap-4">
+                <Link href="/cart">
+                  <Button className="h-14 w-full text-lg font-semibold">
+                    {existingCartItem ? "View Cart" : "Add to Cart"}
+                  </Button>
+                </Link>
 
-                <p className="mt-3 text-lg font-bold">
-                  {product.categories?.name}
-                </p>
+                <BuyNowButton
+                  productId={product.id}
+                  stockQuantity={product.stock_quantity ?? 0}
+                  isActive={product.is_active ?? true}
+                />
               </div>
             </div>
           </div>
         </div>
+
+        {relatedProducts && relatedProducts.length > 0 && (
+          <section className="mt-16">
+            <h2 className="mb-6 text-3xl font-black">Related Products</h2>
+
+            <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
+              {relatedProducts.map((related: any) => (
+  <ProductCard
+    key={related.id}
+    product={related}
+  />
+))}
+            </div>
+          </section>
+        )}
       </section>
-
-      {relatedProducts && relatedProducts.length > 0 && (
-        <section className="mx-auto max-w-7xl px-4 pb-12 sm:px-6 sm:pb-16">
-          <div className="mb-8">
-            <h2 className="text-3xl font-black sm:text-4xl">
-              Related Products
-            </h2>
-
-            <p className="mt-2 text-neutral-500">
-              Discover similar nearby products.
-            </p>
-          </div>
-
-          <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
-            {relatedProducts.map((related: any) => (
-              <div
-                key={related.id}
-                className="group overflow-hidden rounded-3xl border bg-white shadow-sm transition-all duration-200 hover:-translate-y-1 hover:shadow-xl"
-              >
-                <div className="relative aspect-square bg-neutral-100">
-                  {related.image_url ? (
-                    <Image
-                      src={related.image_url}
-                      alt={related.title}
-                      fill
-                      sizes="300px"
-                      className="object-cover transition duration-300 group-hover:scale-105"
-                    />
-                  ) : (
-                    <div className="flex h-full items-center justify-center text-neutral-400">
-                      No Image
-                    </div>
-                  )}
-                </div>
-
-                <div className="p-5">
-                  <h3 className="line-clamp-1 text-lg font-bold">
-                    {related.title}
-                  </h3>
-
-                  <p className="mt-3 text-2xl font-black">₹ {related.price}</p>
-                </div>
-              </div>
-            ))}
-          </div>
-        </section>
-      )}
     </main>
   );
 }
