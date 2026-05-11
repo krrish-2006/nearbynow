@@ -195,7 +195,7 @@ export default function Navbar() {
             {isSellerAccount && (
               <div className="flex rounded-full border bg-neutral-100 p-1">
                 <Link
-                  href="/"
+                  href="/buyer"
                   className={`flex h-10 items-center justify-center rounded-full px-5 text-sm font-semibold transition ${
                     !isSeller
                       ? "bg-black text-white"
