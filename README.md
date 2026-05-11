@@ -1,36 +1,102 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# NearbyNow
 
-## Getting Started
+NearbyNow is a local marketplace app where buyers discover products from nearby shops and sellers manage their shop listings. The current MVP focuses on Durgapur, with other cities shown as coming soon.
 
-First, run the development server:
+## Tech Stack
+
+- Next.js App Router
+- React
+- TypeScript
+- Tailwind CSS
+- Supabase Auth
+- Supabase PostgreSQL
+- Supabase Storage
+- Server Actions
+- Zod
+- React Hook Form
+
+## Main Features
+
+- Buyer marketplace homepage
+- Product search and category filtering
+- Product detail pages
+- City selector
+- Add to cart
+- Direct Buy Now checkout
+- COD order flow
+- Stock tracking and stock decrement after orders
+- Buyer order history
+- Seller portal
+- Seller product create/edit/delete
+- Product image upload
+- Seller order view
+
+## Local Setup
+
+Install dependencies:
+
+```bash
+npm install
+```
+
+Create local environment variables:
+
+```bash
+copy .env.example .env.local
+```
+
+Fill in the Supabase values in `.env.local`.
+
+Run the dev server:
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open:
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```txt
+http://localhost:3000
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Verification Commands
 
-## Learn More
+```bash
+npx tsc --noEmit
+npm run lint
+npm run build
+```
 
-To learn more about Next.js, take a look at the following resources:
+On Windows, `npm run build` can require permission outside restricted sandboxes because Next.js spawns worker processes.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Supabase Commands
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+Check migration state:
 
-## Deploy on Vercel
+```bash
+npx supabase migration list
+```
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+Push migrations:
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+```bash
+npx supabase db push
+```
+
+Migration filenames must use the Supabase timestamp format:
+
+```txt
+YYYYMMDDHHMMSS_name.sql
+```
+
+## Project Context
+
+For AI/Codex handoff, read:
+
+- `PROJECT_CONTEXT.md`
+- `NEXT_TASKS.md`
+- `docs/architecture.md`
+- `docs/database.md`
+- `docs/flows.md`
+
+Start new Codex sessions by asking it to read `PROJECT_CONTEXT.md` before editing.
