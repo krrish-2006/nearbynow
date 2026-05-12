@@ -46,3 +46,9 @@ test("seller portal redirects anonymous visitors to login", async ({ page }) => 
 
   await expect(page).toHaveURL(/\/login$/);
 });
+
+test("buyer profile route redirects to marketplace", async ({ page }) => {
+  await page.goto("/buyer");
+
+  await expect(page).toHaveURL("/");
+});

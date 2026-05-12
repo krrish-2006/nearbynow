@@ -28,16 +28,18 @@ export async function proxy(request: NextRequest) {
 
   const isAuthPage = pathname.startsWith("/login");
 
-  const isBuyerPage = pathname.startsWith("/buyer");
-
   const isSellerPage = pathname.startsWith("/seller");
 
-  if ((isBuyerPage || isSellerPage) && !user) {
+  if (pathname.startsWith("/buyer")) {
+    return NextResponse.redirect(new URL("/", request.url));
+  }
+
+  if (isSellerPage && !user) {
     return NextResponse.redirect(new URL("/login", request.url));
   }
 
   if (isAuthPage && user) {
-    return NextResponse.redirect(new URL("/buyer", request.url));
+    return NextResponse.redirect(new URL("/", request.url));
   }
 
   return response;
