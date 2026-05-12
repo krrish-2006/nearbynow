@@ -30,8 +30,16 @@ export async function proxy(request: NextRequest) {
 
   const isSellerPage = pathname.startsWith("/seller");
 
+  const isHomePage = pathname === "/";
+
+  const hasAuthCode = request.nextUrl.searchParams.has("code");
+
   if (pathname.startsWith("/buyer")) {
     return NextResponse.redirect(new URL("/", request.url));
+  }
+
+  if (isHomePage && !user && !hasAuthCode) {
+    return NextResponse.redirect(getLoginUrl(request));
   }
 
   if (isSellerPage && !user) {
@@ -46,5 +54,16 @@ export async function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/buyer/:path*", "/seller/:path*", "/login"],
+  matcher: ["/", "/buyer/:path*", "/seller/:path*", "/login"],
 };
+
+function getLoginUrl(request: NextRequest) {
+  const url = new URL("/login", request.url);
+
+  if (request.nextUrl.host === "nearbynow.store") {
+    url.protocol = "https:";
+    url.host = "www.nearbynow.store";
+  }
+
+  return url;
+}

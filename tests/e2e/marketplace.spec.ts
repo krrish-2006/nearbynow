@@ -3,7 +3,7 @@ import {
   test,
 } from "@playwright/test";
 
-test("public marketplace shell renders", async ({ page }) => {
+test("homepage redirects anonymous visitors to login", async ({ page }) => {
   const consoleErrors: string[] = [];
 
   page.on("console", (message) => {
@@ -18,6 +18,8 @@ test("public marketplace shell renders", async ({ page }) => {
 
   await page.goto("/");
 
+  await expect(page).toHaveURL(/\/login$/);
+
   await expect(
     page.getByRole("heading", {
       name: "NearbyNow",
@@ -25,11 +27,10 @@ test("public marketplace shell renders", async ({ page }) => {
   ).toBeVisible();
 
   await expect(
-    page.getByPlaceholder("Search nearby products..."),
+    page.getByRole("button", {
+      name: "Continue with Google",
+    }),
   ).toBeVisible();
-
-  await expect(page.getByRole("link", { name: "Cart" })).toBeVisible();
-  await expect(page.getByRole("link", { name: "Orders" })).toBeVisible();
   expect(consoleErrors).toEqual([]);
 });
 
@@ -47,8 +48,10 @@ test("seller portal redirects anonymous visitors to login", async ({ page }) => 
   await expect(page).toHaveURL(/\/login$/);
 });
 
-test("buyer profile route redirects to marketplace", async ({ page }) => {
+test("buyer profile route redirects anonymous visitors to login", async ({
+  page,
+}) => {
   await page.goto("/buyer");
 
-  await expect(page).toHaveURL("/");
+  await expect(page).toHaveURL(/\/login$/);
 });
