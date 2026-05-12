@@ -76,6 +76,11 @@ export default function Navbar() {
     setIsProfileMenuOpen,
   ] = useState(false);
 
+  const [
+    isSellerSwitchPending,
+    setIsSellerSwitchPending,
+  ] = useState(false);
+
   useEffect(() => {
     async function loadData() {
       const supabase =
@@ -113,12 +118,24 @@ export default function Navbar() {
 
         if (profile) {
           setProfile(profile);
-        }
 
-        setIsSellerAccount(
-          profile?.role ===
-            "seller",
-        );
+          setIsSellerAccount(
+            profile.role ===
+              "seller",
+          );
+        } else {
+          setProfile({
+            avatar_url: null,
+            email: user.email ?? "Signed in user",
+            full_name:
+              typeof user.user_metadata.full_name === "string"
+                ? user.user_metadata.full_name
+                : null,
+            role: "buyer",
+          });
+
+          setIsSellerAccount(false);
+        }
       }
 
       const cityCookie =
@@ -155,10 +172,35 @@ export default function Navbar() {
 
     setIsProfileMenuOpen(false);
     setProfile(null);
+    setIsSellerAccount(false);
 
     router.refresh();
 
     router.push("/login");
+  }
+
+  async function handleSellerSwitch() {
+    if (isSellerAccount) {
+      router.push("/seller");
+
+      return;
+    }
+
+    setIsSellerSwitchPending(true);
+
+    const response = await fetch("/api/seller/upgrade", {
+      method: "POST",
+    });
+
+    if (response.ok) {
+      router.refresh();
+
+      window.location.href = "/seller";
+
+      return;
+    }
+
+    setIsSellerSwitchPending(false);
   }
 
   const navButtonClass =
@@ -190,9 +232,10 @@ export default function Navbar() {
           )}
         </div>
 
-        {authLoaded && (
-          <div className="flex flex-wrap items-center justify-end gap-3">
-            {isSellerAccount && (
+        <div className="flex flex-wrap items-center justify-end gap-3">
+          {authLoaded && (
+            <>
+              {profile && (
               <div className="flex rounded-full border bg-neutral-100 p-1">
                 <Link
                   href="/buyer"
@@ -205,8 +248,10 @@ export default function Navbar() {
                   Buyer
                 </Link>
 
-                <Link
-                  href="/seller"
+                <button
+                  type="button"
+                  onClick={handleSellerSwitch}
+                  disabled={isSellerSwitchPending}
                   className={`flex h-10 items-center justify-center rounded-full px-5 text-sm font-semibold transition ${
                     isSeller
                       ? "bg-black text-white"
@@ -214,92 +259,93 @@ export default function Navbar() {
                   }`}
                 >
                   Seller
-                </Link>
-              </div>
-            )}
-
-            {!isSeller && !isSellerAccount && (
-              <BecomeSellerButton />
-            )}
-
-            {!isSeller && (
-              <>
-                <Link
-                  href="/cart"
-                  className={
-                    navButtonClass
-                  }
-                >
-                  Cart
-                </Link>
-
-                <Link
-                  href="/orders"
-                  className={
-                    navButtonClass
-                  }
-                >
-                  Orders
-                </Link>
-              </>
-            )}
-
-            {profile && (
-              <div className="relative">
-                <button
-                  type="button"
-                  onClick={() =>
-                    setIsProfileMenuOpen(
-                      (isOpen) => !isOpen,
-                    )
-                  }
-                  className="relative flex h-11 w-11 items-center justify-center overflow-hidden rounded-full border bg-neutral-100 text-sm font-bold text-neutral-700 transition hover:ring-2 hover:ring-black"
-                  aria-haspopup="menu"
-                  aria-expanded={isProfileMenuOpen}
-                  aria-label="Open profile menu"
-                >
-                  {profile.avatar_url ? (
-                    <Image
-                      src={profile.avatar_url}
-                      alt={profile.full_name || "Profile"}
-                      fill
-                      sizes="44px"
-                      className="object-cover"
-                    />
-                  ) : (
-                    profileInitial
-                  )}
                 </button>
-
-                {isProfileMenuOpen && (
-                  <div
-                    role="menu"
-                    className="absolute right-0 mt-3 w-72 overflow-hidden rounded-2xl border bg-white shadow-xl"
-                  >
-                    <div className="border-b p-4">
-                      <p className="truncate text-sm font-bold text-neutral-900">
-                        {profile.full_name || "NearbyNow Buyer"}
-                      </p>
-
-                      <p className="mt-1 truncate text-sm text-neutral-500">
-                        {profile.email}
-                      </p>
-                    </div>
-
-                    <div className="p-3">
-                      <Button
-                        onClick={handleLogout}
-                        className="h-11 w-full rounded-xl text-sm"
-                      >
-                        Logout
-                      </Button>
-                    </div>
-                  </div>
-                )}
               </div>
-            )}
-          </div>
-        )}
+              )}
+
+              {!isSeller && !profile && !isSellerAccount && (
+                <BecomeSellerButton />
+              )}
+            </>
+          )}
+
+          {!isSeller && (
+            <>
+              <Link
+                href="/cart"
+                className={
+                  navButtonClass
+                }
+              >
+                Cart
+              </Link>
+
+              <Link
+                href="/orders"
+                className={
+                  navButtonClass
+                }
+              >
+                Orders
+              </Link>
+            </>
+          )}
+
+          {profile && (
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() =>
+                  setIsProfileMenuOpen(
+                    (isOpen) => !isOpen,
+                  )
+                }
+                className="relative flex h-11 w-11 items-center justify-center overflow-hidden rounded-full border bg-neutral-100 text-sm font-bold text-neutral-700 transition hover:ring-2 hover:ring-black"
+                aria-haspopup="menu"
+                aria-expanded={isProfileMenuOpen}
+                aria-label="Open profile menu"
+              >
+                {profile.avatar_url ? (
+                  <Image
+                    src={profile.avatar_url}
+                    alt={profile.full_name || "Profile"}
+                    fill
+                    sizes="44px"
+                    className="object-cover"
+                  />
+                ) : (
+                  profileInitial
+                )}
+              </button>
+
+              {isProfileMenuOpen && (
+                <div
+                  role="menu"
+                  className="absolute right-0 mt-3 w-72 overflow-hidden rounded-2xl border bg-white shadow-xl"
+                >
+                  <div className="border-b p-4">
+                    <p className="truncate text-sm font-bold text-neutral-900">
+                      {profile.full_name || "NearbyNow Buyer"}
+                    </p>
+
+                    <p className="mt-1 truncate text-sm text-neutral-500">
+                      {profile.email}
+                    </p>
+                  </div>
+
+                  <div className="p-3">
+                    <Button
+                      onClick={handleLogout}
+                      className="h-11 w-full rounded-xl text-sm"
+                    >
+                      Logout
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
       </div>
     </header>
   );

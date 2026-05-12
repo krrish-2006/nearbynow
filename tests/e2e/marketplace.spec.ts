@@ -9,7 +9,8 @@ test("public marketplace shell renders", async ({ page }) => {
   page.on("console", (message) => {
     if (
       message.type() === "error" &&
-      !message.text().includes("404 (Not Found)")
+      !message.text().includes("404 (Not Found)") &&
+      !message.text().includes("/_next/webpack-hmr")
     ) {
       consoleErrors.push(message.text());
     }
