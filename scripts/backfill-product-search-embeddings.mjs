@@ -1,7 +1,7 @@
 import { createClient } from "@supabase/supabase-js";
 
-const DEFAULT_EMBEDDING_MODEL = "intfloat/multilingual-e5-small";
-const EXPECTED_EMBEDDING_DIMENSIONS = 384;
+const DEFAULT_EMBEDDING_MODEL = "intfloat/multilingual-e5-large";
+const EXPECTED_EMBEDDING_DIMENSIONS = 1024;
 
 function requiredEnv(name) {
   const value = process.env[name];
@@ -92,7 +92,7 @@ async function generateEmbedding(text) {
   const model = process.env.HUGGINGFACE_EMBEDDING_MODEL ?? DEFAULT_EMBEDDING_MODEL;
 
   const response = await fetch(
-    `https://api-inference.huggingface.co/models/${model}`,
+    `https://router.huggingface.co/hf-inference/models/${model}`,
     {
       method: "POST",
       headers: {
@@ -101,9 +101,8 @@ async function generateEmbedding(text) {
       },
       body: JSON.stringify({
         inputs: `passage: ${text.slice(0, 4000)}`,
-        options: {
-          wait_for_model: true,
-        },
+        normalize: true,
+        truncate: true,
       }),
     },
   );

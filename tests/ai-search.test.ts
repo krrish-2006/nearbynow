@@ -15,12 +15,22 @@ import {
   buildProductSearchText,
 } from "../src/features/search/utils/product-search-text.ts";
 
-const migration = readFileSync(
+const initialMigration = readFileSync(
   join(
     process.cwd(),
     "supabase",
     "migrations",
     "20260512143000_add_ai_product_search.sql",
+  ),
+  "utf8",
+);
+
+const supportedModelMigration = readFileSync(
+  join(
+    process.cwd(),
+    "supabase",
+    "migrations",
+    "20260512150000_use_supported_hf_embedding_model.sql",
   ),
   "utf8",
 );
@@ -66,19 +76,22 @@ test("parses token embedding responses by averaging token vectors", () => {
 });
 
 test("ai search migration adds pgvector-backed marketplace search", () => {
-  assert.match(migration, /create extension if not exists vector/i);
+  assert.match(initialMigration, /create extension if not exists vector/i);
   assert.match(
-    migration,
-    /add column if not exists search_embedding extensions\.vector\(384\)/i,
+    supportedModelMigration,
+    /add column search_embedding extensions\.vector\(1024\)/i,
   );
   assert.match(
-    migration,
+    supportedModelMigration,
     /create or replace function public\.search_marketplace_products/i,
   );
-  assert.match(migration, /products\.search_embedding <=> p_query_embedding::vector/i);
-  assert.match(migration, /products\.is_active = true/i);
   assert.match(
-    migration,
+    supportedModelMigration,
+    /products\.search_embedding <=> p_query_embedding::vector/i,
+  );
+  assert.match(supportedModelMigration, /products\.is_active = true/i);
+  assert.match(
+    supportedModelMigration,
     /grant execute on function public\.search_marketplace_products/i,
   );
 });

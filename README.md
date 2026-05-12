@@ -51,7 +51,7 @@ Optional AI search values:
 
 ```bash
 HUGGINGFACE_API_KEY=
-HUGGINGFACE_EMBEDDING_MODEL=intfloat/multilingual-e5-small
+HUGGINGFACE_EMBEDDING_MODEL=intfloat/multilingual-e5-large
 ```
 
 After the AI search migration is applied and `HUGGINGFACE_API_KEY` is set, backfill existing product embeddings:

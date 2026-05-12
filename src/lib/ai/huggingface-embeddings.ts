@@ -1,5 +1,5 @@
-const DEFAULT_EMBEDDING_MODEL = "intfloat/multilingual-e5-small";
-const EXPECTED_EMBEDDING_DIMENSIONS = 384;
+const DEFAULT_EMBEDDING_MODEL = "intfloat/multilingual-e5-large";
+const EXPECTED_EMBEDDING_DIMENSIONS = 1024;
 
 export type EmbeddingMode = "query" | "passage";
 
@@ -110,7 +110,7 @@ export async function generateTextEmbedding(
     process.env.HUGGINGFACE_EMBEDDING_MODEL ?? DEFAULT_EMBEDDING_MODEL;
 
   const response = await fetch(
-    `https://api-inference.huggingface.co/models/${model}`,
+    `https://router.huggingface.co/hf-inference/models/${model}`,
     {
       method: "POST",
       headers: {
@@ -119,9 +119,8 @@ export async function generateTextEmbedding(
       },
       body: JSON.stringify({
         inputs: `${mode}: ${trimmedText.slice(0, 4000)}`,
-        options: {
-          wait_for_model: true,
-        },
+        normalize: true,
+        truncate: true,
       }),
       cache: "no-store",
     },
