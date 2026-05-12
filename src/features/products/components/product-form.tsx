@@ -40,6 +40,7 @@ type ProductFormProps = {
     title: string;
     description: string;
     imageUrl: string | null;
+    imageUrls?: string[];
     price: number;
     stockQuantity: number;
     categoryId: string;
@@ -145,7 +146,7 @@ export function ProductForm({
 
     formData.append("title", values.title);
 
-    formData.append("description", values.description);
+    formData.append("description", values.description ?? "");
 
     formData.append("price", values.price.toString());
 
@@ -197,7 +198,7 @@ export function ProductForm({
       </div>
 
       <div className="space-y-2">
-        <label className="text-sm font-medium">Description</label>
+        <label className="text-sm font-medium">Description optional</label>
 
         <textarea
           {...descriptionRegister}
@@ -288,19 +289,33 @@ export function ProductForm({
         <div className="rounded-2xl border border-dashed p-4">
           {selectedImages.length === 0 ? (
             <div className="space-y-4">
-              {initialValues?.imageUrl && (
-                <div className="max-w-sm overflow-hidden rounded-xl border bg-neutral-50">
-                  <Image
-                    src={initialValues.imageUrl}
-                    alt="Current product image"
-                    width={320}
-                    height={128}
-                    className="h-32 w-full object-cover"
-                  />
+              {(initialValues?.imageUrls?.length || initialValues?.imageUrl) && (
+                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                  {(initialValues.imageUrls?.length
+                    ? initialValues.imageUrls
+                    : initialValues.imageUrl
+                      ? [initialValues.imageUrl]
+                      : []
+                  ).map((imageUrl, index) => (
+                    <div
+                      key={imageUrl}
+                      className="overflow-hidden rounded-xl border bg-neutral-50"
+                    >
+                      <Image
+                        src={imageUrl}
+                        alt={`Current product image ${index + 1}`}
+                        width={320}
+                        height={128}
+                        className="h-32 w-full object-cover"
+                      />
 
-                  <p className="truncate px-3 py-2 text-xs font-medium text-neutral-600">
-                    Current primary image
-                  </p>
+                      <p className="truncate px-3 py-2 text-xs font-medium text-neutral-600">
+                        {index === 0
+                          ? "Current primary image"
+                          : `Current image ${index + 1}`}
+                      </p>
+                    </div>
+                  ))}
                 </div>
               )}
 
@@ -308,7 +323,7 @@ export function ProductForm({
                 htmlFor="product-image-input"
                 className="inline-flex h-11 cursor-pointer items-center justify-center rounded-xl bg-black px-5 text-sm font-semibold text-white transition hover:opacity-90"
               >
-                {initialValues?.imageUrl ? "Replace Image" : "Choose File"}
+                {initialValues?.imageUrl ? "Replace Images" : "Choose Files"}
               </label>
             </div>
           ) : (
@@ -340,7 +355,7 @@ export function ProductForm({
                   htmlFor="product-image-input"
                   className="inline-flex h-10 cursor-pointer items-center justify-center rounded-xl border px-4 text-sm font-semibold transition hover:bg-neutral-100"
                 >
-                  Choose File
+                  Choose Files
                 </label>
 
                 <button
@@ -357,8 +372,8 @@ export function ProductForm({
           )}
 
           <p className="mt-3 text-xs text-neutral-500">
-            Up to {MAX_PRODUCT_IMAGES} images can be selected. Current product
-            storage saves the first selected image as the primary image.
+            Up to {MAX_PRODUCT_IMAGES} images can be uploaded. The first
+            selected image becomes the primary image.
           </p>
         </div>
 

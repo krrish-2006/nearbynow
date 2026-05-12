@@ -10,6 +10,11 @@ export type ProductCategorySummary = {
   name: string;
 } | null;
 
+export type ProductImageSummary = Pick<
+  Tables<"product_images">,
+  "id" | "image_url" | "position" | "is_primary"
+>;
+
 export type ProductCardProduct = Pick<
   ProductRow,
   | "id"
@@ -29,6 +34,7 @@ export type MarketplaceProduct = ProductCardProduct & {
 export type ProductDetails = ProductRow & {
   shops?: ProductShopSummary;
   categories?: ProductCategorySummary;
+  product_images?: ProductImageSummary[];
 };
 
 export type ProductFilters = {

@@ -14,7 +14,12 @@ export type SellerEditableProduct = Pick<
   | "price"
   | "stock_quantity"
   | "category_id"
->;
+> & {
+  product_images?: Pick<
+    Tables<"product_images">,
+    "id" | "image_url" | "position" | "is_primary"
+  >[];
+};
 
 export type SellerOrderItem = Pick<
   Tables<"order_items">,

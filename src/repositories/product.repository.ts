@@ -22,6 +22,8 @@ import {
 } from "@/features/search/utils/semantic-results";
 
 type Product = Tables<"products">;
+type ProductImageInsert =
+  Database["public"]["Tables"]["product_images"]["Insert"];
 type ProductSearchRow =
   Database["public"]["Functions"]["search_marketplace_products"]["Returns"][number];
 type FuzzyProductSearchRow =
@@ -46,6 +48,12 @@ const PRODUCT_DETAILS_SELECT = `
   ),
   categories (
     name
+  ),
+  product_images (
+    id,
+    image_url,
+    position,
+    is_primary
   )
 `;
 
@@ -211,7 +219,13 @@ export async function getSellerEditableProductById(
         image_url,
         price,
         stock_quantity,
-        category_id
+        category_id,
+        product_images (
+          id,
+          image_url,
+          position,
+          is_primary
+        )
       `,
     )
     .eq("id", productId)
@@ -223,6 +237,36 @@ export async function getSellerEditableProductById(
   }
 
   return data;
+}
+
+export async function replaceProductImages(
+  supabase: SupabaseClient<Database>,
+  productId: string,
+  images: Omit<ProductImageInsert, "product_id">[]
+): Promise<boolean> {
+  const { error: deleteError } = await supabase
+    .from("product_images")
+    .delete()
+    .eq("product_id", productId);
+
+  if (deleteError) {
+    return false;
+  }
+
+  if (images.length === 0) {
+    return true;
+  }
+
+  const { error: insertError } = await supabase
+    .from("product_images")
+    .insert(
+      images.map((image) => ({
+        ...image,
+        product_id: productId,
+      })),
+    );
+
+  return !insertError;
 }
 
 export async function getMarketplaceProducts(

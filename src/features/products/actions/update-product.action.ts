@@ -4,10 +4,6 @@ import { revalidatePath } from "next/cache";
 
 import { createClient } from "@/lib/supabase/server";
 import type { ActionResult } from "@/features/actions/action-result";
-import {
-  getProductImageUrl,
-  uploadProductImage,
-} from "@/lib/storage/product-image";
 
 import {
   getShopBySellerId,
@@ -25,8 +21,11 @@ import {
   toPgVectorLiteral,
 } from "@/lib/ai/jina-embeddings";
 import {
-  moderateProductImage,
-} from "@/lib/moderation/product-image-moderation";
+  uploadModeratedProductImages,
+} from "@/features/products/services/product-image-upload.service";
+import {
+  replaceProductImages,
+} from "@/repositories/product.repository";
 
 export async function updateProductAction(
   productId: string,
@@ -77,71 +76,52 @@ export async function updateProductAction(
     };
   }
 
-  let imageUrl: string | null | undefined;
-
   const imageFiles =
     Array.isArray(parsed.data.image)
       ? (parsed.data.image as File[])
       : [];
 
-  const imageFile = imageFiles[0];
+  const uploadedImages = await uploadModeratedProductImages(
+    supabase,
+    imageFiles,
+    user.id,
+  );
 
-  if (imageFile && imageFile.size > 0) {
-    const moderation = await moderateProductImage(imageFile);
-
-    if (!moderation.allowed) {
-      return {
-        success: false,
-        error: moderation.error,
-      };
-    }
-
-    const uploaded = await uploadProductImage(
-      supabase,
-      imageFile,
-      user.id
-    );
-
-    if (uploaded.error || !uploaded.path) {
-      return {
-        success: false,
-        error:
-          uploaded.error ??
-          "Failed to upload image",
-      };
-    }
-
-    imageUrl = getProductImageUrl(
-      supabase,
-      uploaded.path
-    );
+  if (!uploadedImages.success) {
+    return {
+      success: false,
+      error: uploadedImages.error,
+    };
   }
+
+  const primaryImage = uploadedImages.images[0];
+  const description =
+    parsed.data.description.trim() || null;
 
   const searchEmbedding = await generateSearchTextEmbedding(
     buildProductSearchText({
       title: parsed.data.title,
-      description: parsed.data.description,
+      description,
       price: parsed.data.price,
     }),
   );
 
   const imageSearchEmbedding =
-    await generateProductImageEmbedding(imageUrl ?? null);
+    await generateProductImageEmbedding(primaryImage?.imageUrl ?? null);
 
   const { error } = await supabase
     .from("products")
     .update({
       title: parsed.data.title,
-      description:
-        parsed.data.description,
+      description,
       price: parsed.data.price,
       stock_quantity:
         parsed.data.stockQuantity,
       category_id:
         parsed.data.categoryId,
-      ...(imageUrl
+      ...(primaryImage
         ? {
-            image_url: imageUrl,
+            image_url: primaryImage.imageUrl,
           }
         : {}),
       ...(searchEmbedding
@@ -166,6 +146,26 @@ export async function updateProductAction(
       success: false,
       error: error.message,
     };
+  }
+
+  if (uploadedImages.images.length > 0) {
+    const imagesSaved = await replaceProductImages(
+      supabase,
+      productId,
+      uploadedImages.images.map((image) => ({
+        image_url: image.imageUrl,
+        storage_path: image.storagePath,
+        position: image.position,
+        is_primary: image.isPrimary,
+      })),
+    );
+
+    if (!imagesSaved) {
+      return {
+        success: false,
+        error: "Product was updated, but product images could not be saved",
+      };
+    }
   }
 
   revalidatePath("/seller/products");

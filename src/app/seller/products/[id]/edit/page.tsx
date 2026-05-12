@@ -60,6 +60,9 @@ export default async function EditProductPage({
           title: product.title,
           description: product.description ?? "",
           imageUrl: product.image_url,
+          imageUrls: [...(product.product_images ?? [])]
+            .sort((first, second) => first.position - second.position)
+            .map((image) => image.image_url),
           price: product.price,
           stockQuantity: product.stock_quantity,
           categoryId: product.category_id ?? "",

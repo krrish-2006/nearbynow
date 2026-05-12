@@ -52,6 +52,15 @@ export default async function ProductDetailsPage({
   );
 
   const relatedProducts = await getRelatedProducts(supabase, product);
+  const productImages = [...(product.product_images ?? [])]
+    .sort((first, second) => first.position - second.position)
+    .map((image) => image.image_url);
+  const displayImages =
+    productImages.length > 0
+      ? productImages
+      : product.image_url
+        ? [product.image_url]
+        : [];
 
   return (
     <main className="min-h-screen bg-neutral-100">
@@ -59,9 +68,9 @@ export default async function ProductDetailsPage({
         <div className="grid gap-8 lg:grid-cols-2 lg:gap-12">
           <div className="overflow-hidden rounded-[2rem] border bg-white shadow-sm">
             <div className="relative aspect-square bg-neutral-100">
-              {product.image_url ? (
+              {displayImages[0] ? (
                 <Image
-                  src={product.image_url}
+                  src={displayImages[0]}
                   alt={product.title}
                   fill
                   sizes="700px"
@@ -74,6 +83,25 @@ export default async function ProductDetailsPage({
                 </div>
               )}
             </div>
+
+            {displayImages.length > 1 && (
+              <div className="grid grid-cols-4 gap-3 border-t p-4">
+                {displayImages.slice(1).map((imageUrl, index) => (
+                  <div
+                    key={imageUrl}
+                    className="relative aspect-square overflow-hidden rounded-2xl border bg-neutral-100"
+                  >
+                    <Image
+                      src={imageUrl}
+                      alt={`${product.title} image ${index + 2}`}
+                      fill
+                      sizes="140px"
+                      className="object-cover"
+                    />
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
           <div className="space-y-6 sm:space-y-8">
