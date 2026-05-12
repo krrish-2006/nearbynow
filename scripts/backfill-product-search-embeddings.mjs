@@ -1,6 +1,6 @@
 import { createClient } from "@supabase/supabase-js";
 
-const DEFAULT_EMBEDDING_MODEL = "intfloat/multilingual-e5-large";
+const DEFAULT_EMBEDDING_MODEL = "jina-clip-v2";
 const EXPECTED_EMBEDDING_DIMENSIONS = 1024;
 
 function requiredEnv(name) {
@@ -20,56 +20,12 @@ function isNumberArray(value) {
   );
 }
 
-function averageVectors(vectors) {
-  const dimensions = vectors[0]?.length;
-
-  if (!dimensions) {
-    return null;
-  }
-
-  const totals = Array.from({ length: dimensions }, () => 0);
-
-  for (const vector of vectors) {
-    vector.forEach((value, index) => {
-      totals[index] += value;
-    });
-  }
-
-  return totals.map((total) => total / vectors.length);
-}
-
 function normalizeEmbedding(embedding) {
   const magnitude = Math.sqrt(
     embedding.reduce((total, value) => total + value * value, 0),
   );
 
   return magnitude ? embedding.map((value) => value / magnitude) : null;
-}
-
-function parseEmbeddingResponse(value) {
-  if (isNumberArray(value)) {
-    return normalizeEmbedding(value);
-  }
-
-  if (!Array.isArray(value) || value.length === 0) {
-    return null;
-  }
-
-  const first = value[0];
-
-  if (isNumberArray(first)) {
-    const vectors = value.filter(isNumberArray);
-
-    return normalizeEmbedding(
-      vectors.length === 1 ? vectors[0] : averageVectors(vectors) ?? [],
-    );
-  }
-
-  if (Array.isArray(first)) {
-    return parseEmbeddingResponse(first);
-  }
-
-  return null;
 }
 
 function toPgVectorLiteral(embedding) {
@@ -81,43 +37,48 @@ function buildProductSearchText(product) {
     product.title,
     product.description,
     `price ${product.price}`,
-    `₹${product.price}`,
+    `INR ${product.price}`,
   ]
     .filter((part) => Boolean(part?.trim()))
     .join("\n");
 }
 
-async function generateEmbedding(text) {
-  const token = requiredEnv("HUGGINGFACE_API_KEY");
-  const model = process.env.HUGGINGFACE_EMBEDDING_MODEL ?? DEFAULT_EMBEDDING_MODEL;
+async function generateEmbedding(input) {
+  const token = requiredEnv("JINA_API_KEY");
+  const model = process.env.JINA_EMBEDDING_MODEL ?? DEFAULT_EMBEDDING_MODEL;
 
-  const response = await fetch(
-    `https://router.huggingface.co/hf-inference/models/${model}`,
-    {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${token}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        inputs: `passage: ${text.slice(0, 4000)}`,
-        normalize: true,
-        truncate: true,
-      }),
+  const response = await fetch("https://api.jina.ai/v1/embeddings", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
     },
-  );
+    body: JSON.stringify({
+      model,
+      normalized: true,
+      embedding_type: "float",
+      input: [input],
+    }),
+  });
 
   if (!response.ok) {
-    throw new Error(`Hugging Face request failed: ${response.status}`);
+    throw new Error(`Jina embedding request failed: ${response.status}`);
   }
 
-  const embedding = parseEmbeddingResponse(await response.json());
+  const payload = await response.json();
+  const embedding = payload.data?.[0]?.embedding;
 
-  if (embedding?.length !== EXPECTED_EMBEDDING_DIMENSIONS) {
+  if (!isNumberArray(embedding)) {
+    throw new Error("Jina embedding response was not a float vector");
+  }
+
+  const normalizedEmbedding = normalizeEmbedding(embedding);
+
+  if (normalizedEmbedding?.length !== EXPECTED_EMBEDDING_DIMENSIONS) {
     throw new Error("Unexpected embedding dimensions");
   }
 
-  return embedding;
+  return normalizedEmbedding;
 }
 
 const supabase = createClient(
@@ -127,7 +88,7 @@ const supabase = createClient(
 
 const { data: products, error } = await supabase
   .from("products")
-  .select("id,title,description,price")
+  .select("id,title,description,price,image_url")
   .order("created_at", { ascending: false });
 
 if (error) {
@@ -137,12 +98,20 @@ if (error) {
 let updatedCount = 0;
 
 for (const product of products ?? []) {
-  const embedding = await generateEmbedding(buildProductSearchText(product));
+  const searchEmbedding = await generateEmbedding(buildProductSearchText(product));
+  const imageSearchEmbedding = product.image_url
+    ? await generateEmbedding({
+        url: product.image_url,
+      })
+    : null;
 
   const { error: updateError } = await supabase
     .from("products")
     .update({
-      search_embedding: toPgVectorLiteral(embedding),
+      search_embedding: toPgVectorLiteral(searchEmbedding),
+      image_search_embedding: imageSearchEmbedding
+        ? toPgVectorLiteral(imageSearchEmbedding)
+        : null,
     })
     .eq("id", product.id);
 

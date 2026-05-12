@@ -20,9 +20,10 @@ import {
   buildProductSearchText,
 } from "@/features/search/utils/product-search-text";
 import {
-  generateTextEmbedding,
+  generateProductImageEmbedding,
+  generateSearchTextEmbedding,
   toPgVectorLiteral,
-} from "@/lib/ai/huggingface-embeddings";
+} from "@/lib/ai/jina-embeddings";
 
 export async function updateProductAction(
   productId: string,
@@ -104,14 +105,16 @@ export async function updateProductAction(
     );
   }
 
-  const searchEmbedding = await generateTextEmbedding(
+  const searchEmbedding = await generateSearchTextEmbedding(
     buildProductSearchText({
       title: parsed.data.title,
       description: parsed.data.description,
       price: parsed.data.price,
     }),
-    "passage",
   );
+
+  const imageSearchEmbedding =
+    await generateProductImageEmbedding(imageUrl ?? null);
 
   const { error } = await supabase
     .from("products")
@@ -132,6 +135,14 @@ export async function updateProductAction(
       ...(searchEmbedding
         ? {
             search_embedding: toPgVectorLiteral(searchEmbedding),
+          }
+        : {}),
+      ...(imageSearchEmbedding
+        ? {
+            image_search_embedding:
+              toPgVectorLiteral(
+                imageSearchEmbedding,
+              ),
           }
         : {}),
     })

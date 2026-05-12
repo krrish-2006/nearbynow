@@ -9,7 +9,7 @@ export function buildProductSearchText(product: ProductSearchTextInput): string 
     product.title,
     product.description,
     `price ${product.price}`,
-    `₹${product.price}`,
+    `INR ${product.price}`,
   ]
     .filter((part): part is string => Boolean(part?.trim()))
     .join("\n");

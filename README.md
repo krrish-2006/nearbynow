@@ -50,11 +50,11 @@ Fill in the Supabase values in `.env.local`.
 Optional AI search values:
 
 ```bash
-HUGGINGFACE_API_KEY=
-HUGGINGFACE_EMBEDDING_MODEL=intfloat/multilingual-e5-large
+JINA_API_KEY=
+JINA_EMBEDDING_MODEL=jina-clip-v2
 ```
 
-After the AI search migration is applied and `HUGGINGFACE_API_KEY` is set, backfill existing product embeddings:
+After the AI search migration is applied and `JINA_API_KEY` is set, backfill existing product embeddings:
 
 ```bash
 npm run search:backfill

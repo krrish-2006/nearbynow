@@ -4,10 +4,8 @@ import { join } from "node:path";
 import test from "node:test";
 
 import {
-  normalizeEmbedding,
-  parseEmbeddingResponse,
   toPgVectorLiteral,
-} from "../src/lib/ai/huggingface-embeddings.ts";
+} from "../src/lib/ai/jina-embeddings.ts";
 import {
   parseMarketplaceSearchQuery,
 } from "../src/features/search/utils/marketplace-query.ts";
@@ -38,6 +36,16 @@ const supportedModelMigration = readFileSync(
   "utf8",
 );
 
+const multimodalSearchMigration = readFileSync(
+  join(
+    process.cwd(),
+    "supabase",
+    "migrations",
+    "20260512162000_add_multimodal_jina_search.sql",
+  ),
+  "utf8",
+);
+
 test("parses cheap multilingual price search intent", () => {
   assert.deepEqual(
     parseMarketplaceSearchQuery("bhai 5 kilo chawal sasta wala dikha"),
@@ -62,20 +70,12 @@ test("builds product text for embedding without leaking private data", () => {
       description: "Affordable grocery rice pack",
       price: 299,
     }),
-    "Rice 5kg\nAffordable grocery rice pack\nprice 299\n₹299",
+    "Rice 5kg\nAffordable grocery rice pack\nprice 299\nINR 299",
   );
 });
 
-test("normalizes and formats embeddings for pgvector", () => {
-  assert.deepEqual(normalizeEmbedding([3, 4]), [0.6, 0.8]);
+test("formats embeddings for pgvector", () => {
   assert.equal(toPgVectorLiteral([0.123456789, -1]), "[0.12345679,-1.00000000]");
-});
-
-test("parses token embedding responses by averaging token vectors", () => {
-  assert.deepEqual(parseEmbeddingResponse([[1, 0], [0, 1]]), [
-    0.7071067811865475,
-    0.7071067811865475,
-  ]);
 });
 
 test("filters weak semantic matches when one product is clearly best", () => {
@@ -143,4 +143,18 @@ test("ai search migration adds pgvector-backed marketplace search", () => {
     supportedModelMigration,
     /grant execute on function public\.search_marketplace_products/i,
   );
+});
+
+test("multimodal search migration uses image embeddings and fuzzy fallback", () => {
+  assert.match(
+    multimodalSearchMigration,
+    /add column if not exists image_search_embedding extensions\.vector\(1024\)/i,
+  );
+  assert.match(multimodalSearchMigration, /products\.image_search_embedding <=>/i);
+  assert.match(
+    multimodalSearchMigration,
+    /create or replace function public\.search_marketplace_products_fuzzy/i,
+  );
+  assert.match(multimodalSearchMigration, /create extension if not exists pg_trgm/i);
+  assert.match(multimodalSearchMigration, /similarity\(lower\(products\.title\)/i);
 });

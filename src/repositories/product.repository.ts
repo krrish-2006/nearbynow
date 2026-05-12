@@ -11,9 +11,9 @@ import type {
   SellerProductCard,
 } from "@/features/seller/types/seller.types";
 import {
-  generateTextEmbedding,
+  generateSearchTextEmbedding,
   toPgVectorLiteral,
-} from "@/lib/ai/huggingface-embeddings";
+} from "@/lib/ai/jina-embeddings";
 import {
   parseMarketplaceSearchQuery,
 } from "@/features/search/utils/marketplace-query";
@@ -24,6 +24,8 @@ import {
 type Product = Tables<"products">;
 type ProductSearchRow =
   Database["public"]["Functions"]["search_marketplace_products"]["Returns"][number];
+type FuzzyProductSearchRow =
+  Database["public"]["Functions"]["search_marketplace_products_fuzzy"]["Returns"][number];
 
 const PRODUCT_CARD_SELECT = `
   id,
@@ -80,9 +82,8 @@ async function getSemanticMarketplaceProducts(
   }
 
   const parsedSearch = parseMarketplaceSearchQuery(filters.search);
-  const embedding = await generateTextEmbedding(
+  const embedding = await generateSearchTextEmbedding(
     parsedSearch.cleanedSearch,
-    "query",
   );
 
   if (!embedding) {
@@ -104,6 +105,34 @@ async function getSemanticMarketplaceProducts(
   return toMarketplaceProductsFromSearchRows(
     filterRelevantSemanticResults(data ?? []),
   );
+}
+
+async function getFuzzyMarketplaceProducts(
+  supabase: SupabaseClient<Database>,
+  filters: ProductFilters
+): Promise<MarketplaceProduct[]> {
+  if (!filters.search?.trim()) {
+    return [];
+  }
+
+  const parsedSearch = parseMarketplaceSearchQuery(filters.search);
+
+  const { data, error } = await supabase.rpc(
+    "search_marketplace_products_fuzzy",
+    {
+      p_search: parsedSearch.cleanedSearch,
+      p_category_id: filters.categoryId ?? null,
+      p_max_price: parsedSearch.maxPrice,
+      p_prefer_cheap: parsedSearch.preferCheap,
+      p_match_count: 32,
+    },
+  );
+
+  if (error) {
+    return [];
+  }
+
+  return toMarketplaceProductsFromSearchRows(data as FuzzyProductSearchRow[]);
 }
 
 export async function getProductsByShopId(
@@ -212,6 +241,15 @@ export async function getMarketplaceProducts(
 
     if (semanticProducts.length > 0) {
       return semanticProducts;
+    }
+
+    const fuzzyProducts = await getFuzzyMarketplaceProducts(
+      supabase,
+      filters,
+    );
+
+    if (fuzzyProducts.length > 0) {
+      return fuzzyProducts;
     }
   }
 
