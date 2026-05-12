@@ -29,6 +29,9 @@ import {
   generateSearchTextEmbedding,
   toPgVectorLiteral,
 } from "@/lib/ai/jina-embeddings";
+import {
+  moderateProductImage,
+} from "@/lib/moderation/product-image-moderation";
 
 export async function createProductAction(
   formData: FormData
@@ -88,6 +91,15 @@ export async function createProductAction(
   const imageFile = imageFiles[0];
 
   if (imageFile && imageFile.size > 0) {
+    const moderation = await moderateProductImage(imageFile);
+
+    if (!moderation.allowed) {
+      return {
+        success: false,
+        error: moderation.error,
+      };
+    }
+
     const uploaded = await uploadProductImage(
       supabase,
       imageFile,

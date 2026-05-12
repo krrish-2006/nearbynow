@@ -52,6 +52,8 @@ Optional AI search values:
 ```bash
 JINA_API_KEY=
 JINA_EMBEDDING_MODEL=jina-clip-v2
+HUGGINGFACE_API_KEY=
+HUGGINGFACE_NSFW_MODEL=Falconsai/nsfw_image_detection
 ```
 
 After the AI search migration is applied and `JINA_API_KEY` is set, backfill existing product embeddings:
