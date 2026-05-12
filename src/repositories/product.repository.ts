@@ -22,6 +22,7 @@ import {
 } from "@/features/search/utils/semantic-results";
 
 type Product = Tables<"products">;
+type ProductImage = Tables<"product_images">;
 type ProductImageInsert =
   Database["public"]["Tables"]["product_images"]["Insert"];
 type ProductSearchRow =
@@ -52,6 +53,7 @@ const PRODUCT_DETAILS_SELECT = `
   product_images (
     id,
     image_url,
+    storage_path,
     position,
     is_primary
   )
@@ -223,6 +225,7 @@ export async function getSellerEditableProductById(
         product_images (
           id,
           image_url,
+          storage_path,
           position,
           is_primary
         )
@@ -234,6 +237,23 @@ export async function getSellerEditableProductById(
 
   if (error || !data) {
     return null;
+  }
+
+  return data;
+}
+
+export async function getProductImagesByProductId(
+  supabase: SupabaseClient<Database>,
+  productId: string
+): Promise<ProductImage[]> {
+  const { data, error } = await supabase
+    .from("product_images")
+    .select("*")
+    .eq("product_id", productId)
+    .order("position");
+
+  if (error || !data) {
+    return [];
   }
 
   return data;

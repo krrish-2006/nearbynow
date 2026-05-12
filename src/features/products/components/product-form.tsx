@@ -40,7 +40,10 @@ type ProductFormProps = {
     title: string;
     description: string;
     imageUrl: string | null;
-    imageUrls?: string[];
+    images?: {
+      id: string;
+      imageUrl: string;
+    }[];
     price: number;
     stockQuantity: number;
     categoryId: string;
@@ -52,8 +55,14 @@ type ProductFormProps = {
 };
 
 type SelectedImage = {
+  id: string;
   file: File;
   previewUrl: string;
+};
+
+type ExistingImage = {
+  id: string;
+  imageUrl: string;
 };
 
 export function ProductForm({
@@ -66,9 +75,15 @@ export function ProductForm({
 
   const [isPending, startTransition] = useTransition();
 
+  const [existingImages, setExistingImages] = useState<ExistingImage[]>(
+    initialValues?.images ?? [],
+  );
   const [selectedImages, setSelectedImages] = useState<SelectedImage[]>([]);
   const [imageError, setImageError] = useState<string | null>(null);
+  const selectedImagesRef = useRef<SelectedImage[]>([]);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const totalImageCount = existingImages.length + selectedImages.length;
+  const canAddImages = totalImageCount < MAX_PRODUCT_IMAGES;
 
   const {
     register,
@@ -101,44 +116,69 @@ export function ProductForm({
   });
 
   useEffect(() => {
-    return () => {
-      selectedImages.forEach((image) => URL.revokeObjectURL(image.previewUrl));
-    };
+    selectedImagesRef.current = selectedImages;
   }, [selectedImages]);
 
-  function clearSelectedImages() {
-    selectedImages.forEach((image) => URL.revokeObjectURL(image.previewUrl));
-    setSelectedImages([]);
-    setImageError(null);
+  useEffect(() => {
+    return () => {
+      selectedImagesRef.current.forEach((image) =>
+        URL.revokeObjectURL(image.previewUrl),
+      );
+    };
+  }, []);
 
+  function resetFileInput() {
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
     }
   }
 
+  function removeExistingImage(imageId: string) {
+    setExistingImages((images) =>
+      images.filter((image) => image.id !== imageId),
+    );
+    setImageError(null);
+  }
+
+  function removeSelectedImage(imageId: string) {
+    setSelectedImages((images) => {
+      const imageToRemove = images.find((image) => image.id === imageId);
+
+      if (imageToRemove) {
+        URL.revokeObjectURL(imageToRemove.previewUrl);
+      }
+
+      return images.filter((image) => image.id !== imageId);
+    });
+    setImageError(null);
+    resetFileInput();
+  }
+
   function handleImageChange(files: FileList | null) {
     const nextFiles = Array.from(files ?? []);
+    const remainingSlots = MAX_PRODUCT_IMAGES - totalImageCount;
 
-    selectedImages.forEach((image) => URL.revokeObjectURL(image.previewUrl));
+    if (nextFiles.length === 0) {
+      return;
+    }
 
-    if (nextFiles.length > MAX_PRODUCT_IMAGES) {
-      setSelectedImages([]);
+    if (nextFiles.length > remainingSlots) {
       setImageError(`You can upload up to ${MAX_PRODUCT_IMAGES} images`);
-
-      if (fileInputRef.current) {
-        fileInputRef.current.value = "";
-      }
+      resetFileInput();
 
       return;
     }
 
     setImageError(null);
-    setSelectedImages(
-      nextFiles.map((file) => ({
+    setSelectedImages((images) => [
+      ...images,
+      ...nextFiles.map((file) => ({
+        id: crypto.randomUUID(),
         file,
         previewUrl: URL.createObjectURL(file),
       })),
-    );
+    ]);
+    resetFileInput();
   }
 
   async function onSubmit(values: ProductSchemaValues) {
@@ -153,6 +193,10 @@ export function ProductForm({
     formData.append("stockQuantity", values.stockQuantity.toString());
 
     formData.append("categoryId", values.categoryId);
+
+    for (const image of existingImages) {
+      formData.append("existingImageId", image.id);
+    }
 
     for (const image of selectedImages) {
       formData.append("image", image.file);
@@ -282,56 +326,49 @@ export function ProductForm({
           accept="image/*"
           multiple
           onChange={(event) => handleImageChange(event.target.files)}
+          disabled={!canAddImages}
           className="sr-only"
           id="product-image-input"
         />
 
         <div className="rounded-2xl border border-dashed p-4">
-          {selectedImages.length === 0 ? (
-            <div className="space-y-4">
-              {(initialValues?.imageUrls?.length || initialValues?.imageUrl) && (
-                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                  {(initialValues.imageUrls?.length
-                    ? initialValues.imageUrls
-                    : initialValues.imageUrl
-                      ? [initialValues.imageUrl]
-                      : []
-                  ).map((imageUrl, index) => (
-                    <div
-                      key={imageUrl}
-                      className="overflow-hidden rounded-xl border bg-neutral-50"
-                    >
-                      <Image
-                        src={imageUrl}
-                        alt={`Current product image ${index + 1}`}
-                        width={320}
-                        height={128}
-                        className="h-32 w-full object-cover"
-                      />
-
-                      <p className="truncate px-3 py-2 text-xs font-medium text-neutral-600">
-                        {index === 0
-                          ? "Current primary image"
-                          : `Current image ${index + 1}`}
-                      </p>
-                    </div>
-                  ))}
-                </div>
-              )}
-
-              <label
-                htmlFor="product-image-input"
-                className="inline-flex h-11 cursor-pointer items-center justify-center rounded-xl bg-black px-5 text-sm font-semibold text-white transition hover:opacity-90"
-              >
-                {initialValues?.imageUrl ? "Replace Images" : "Choose Files"}
-              </label>
-            </div>
-          ) : (
-            <div className="space-y-4">
+          <div className="space-y-4">
+            {totalImageCount > 0 && (
               <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                {selectedImages.map((image) => (
+                {existingImages.map((image, index) => (
                   <div
-                    key={`${image.file.name}-${image.previewUrl}`}
+                    key={image.id}
+                    className="relative overflow-hidden rounded-xl border bg-neutral-50"
+                  >
+                    <Image
+                      src={image.imageUrl}
+                      alt={`Current product image ${index + 1}`}
+                      width={320}
+                      height={128}
+                      className="h-32 w-full object-cover"
+                    />
+
+                    <button
+                      type="button"
+                      onClick={() => removeExistingImage(image.id)}
+                      className="absolute right-2 top-2 inline-flex h-8 w-8 items-center justify-center rounded-full bg-white text-sm font-bold text-red-600 shadow transition hover:bg-red-600 hover:text-white"
+                      aria-label={`Remove current image ${index + 1}`}
+                      title="Remove image"
+                    >
+                      X
+                    </button>
+
+                    <p className="truncate px-3 py-2 text-xs font-medium text-neutral-600">
+                      {index === 0
+                        ? "Current primary image"
+                        : `Current image ${index + 1}`}
+                    </p>
+                  </div>
+                ))}
+
+                {selectedImages.map((image, index) => (
+                  <div
+                    key={image.id}
                     className="relative overflow-hidden rounded-xl border bg-neutral-50"
                   >
                     <Image
@@ -343,33 +380,56 @@ export function ProductForm({
                       className="h-32 w-full object-cover"
                     />
 
+                    <button
+                      type="button"
+                      onClick={() => removeSelectedImage(image.id)}
+                      className="absolute right-2 top-2 inline-flex h-8 w-8 items-center justify-center rounded-full bg-white text-sm font-bold text-red-600 shadow transition hover:bg-red-600 hover:text-white"
+                      aria-label={`Remove selected image ${index + 1}`}
+                      title="Remove image"
+                    >
+                      X
+                    </button>
+
                     <p className="truncate px-3 py-2 text-xs font-medium text-neutral-600">
                       {image.file.name}
                     </p>
                   </div>
                 ))}
               </div>
+            )}
 
-              <div className="flex flex-wrap items-center gap-3">
-                <label
-                  htmlFor="product-image-input"
-                  className="inline-flex h-10 cursor-pointer items-center justify-center rounded-xl border px-4 text-sm font-semibold transition hover:bg-neutral-100"
-                >
-                  Choose Files
-                </label>
+            {totalImageCount === 0 &&
+              initialValues?.imageUrl &&
+              !initialValues.images?.length && (
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                <div className="overflow-hidden rounded-xl border bg-neutral-50">
+                  <Image
+                    src={initialValues.imageUrl}
+                    alt="Current product image"
+                    width={320}
+                    height={128}
+                    className="h-32 w-full object-cover"
+                  />
 
-                <button
-                  type="button"
-                  onClick={clearSelectedImages}
-                  className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-red-200 bg-red-50 text-lg font-bold text-red-600 transition hover:bg-red-600 hover:text-white"
-                  aria-label="Remove selected images"
-                  title="Remove selected images"
-                >
-                  X
-                </button>
+                  <p className="truncate px-3 py-2 text-xs font-medium text-neutral-600">
+                    Current primary image
+                  </p>
+                </div>
               </div>
-            </div>
-          )}
+            )}
+
+            <label
+              htmlFor="product-image-input"
+              className={`inline-flex h-11 items-center justify-center rounded-xl px-5 text-sm font-semibold transition ${
+                canAddImages
+                  ? "cursor-pointer bg-black text-white hover:opacity-90"
+                  : "cursor-not-allowed bg-neutral-200 text-neutral-500"
+              }`}
+              aria-disabled={!canAddImages}
+            >
+              {mode === "edit" ? "Add Images" : "Choose Files"}
+            </label>
+          </div>
 
           <p className="mt-3 text-xs text-neutral-500">
             Up to {MAX_PRODUCT_IMAGES} images can be uploaded. The first

@@ -24,6 +24,7 @@ import {
   uploadModeratedProductImages,
 } from "@/features/products/services/product-image-upload.service";
 import {
+  getProductImagesByProductId,
   replaceProductImages,
 } from "@/repositories/product.repository";
 
@@ -80,6 +81,24 @@ export async function updateProductAction(
     Array.isArray(parsed.data.image)
       ? (parsed.data.image as File[])
       : [];
+  const existingImageIds = formData
+    .getAll("existingImageId")
+    .filter((imageId): imageId is string => typeof imageId === "string");
+
+  if (existingImageIds.length + imageFiles.length > 5) {
+    return {
+      success: false,
+      error: "You can upload up to 5 images",
+    };
+  }
+
+  const currentImages = await getProductImagesByProductId(
+    supabase,
+    productId,
+  );
+  const keptImages = existingImageIds
+    .map((imageId) => currentImages.find((image) => image.id === imageId))
+    .filter((image): image is NonNullable<typeof image> => Boolean(image));
 
   const uploadedImages = await uploadModeratedProductImages(
     supabase,
@@ -94,7 +113,21 @@ export async function updateProductAction(
     };
   }
 
-  const primaryImage = uploadedImages.images[0];
+  const combinedImages = [
+    ...keptImages.map((image) => ({
+      image_url: image.image_url,
+      storage_path: image.storage_path,
+    })),
+    ...uploadedImages.images.map((image) => ({
+      image_url: image.imageUrl,
+      storage_path: image.storagePath,
+    })),
+  ].map((image, index) => ({
+    ...image,
+    position: index,
+    is_primary: index === 0,
+  }));
+  const primaryImage = combinedImages[0];
   const description =
     parsed.data.description.trim() || null;
 
@@ -107,7 +140,7 @@ export async function updateProductAction(
   );
 
   const imageSearchEmbedding =
-    await generateProductImageEmbedding(primaryImage?.imageUrl ?? null);
+    await generateProductImageEmbedding(primaryImage?.image_url ?? null);
 
   const { error } = await supabase
     .from("products")
@@ -119,11 +152,7 @@ export async function updateProductAction(
         parsed.data.stockQuantity,
       category_id:
         parsed.data.categoryId,
-      ...(primaryImage
-        ? {
-            image_url: primaryImage.imageUrl,
-          }
-        : {}),
+      image_url: primaryImage?.image_url ?? null,
       ...(searchEmbedding
         ? {
             search_embedding: toPgVectorLiteral(searchEmbedding),
@@ -136,7 +165,11 @@ export async function updateProductAction(
                 imageSearchEmbedding,
               ),
           }
-        : {}),
+        : primaryImage
+          ? {}
+          : {
+              image_search_embedding: null,
+            }),
     })
     .eq("id", productId)
     .eq("shop_id", sellerShop.id);
@@ -148,24 +181,17 @@ export async function updateProductAction(
     };
   }
 
-  if (uploadedImages.images.length > 0) {
-    const imagesSaved = await replaceProductImages(
-      supabase,
-      productId,
-      uploadedImages.images.map((image) => ({
-        image_url: image.imageUrl,
-        storage_path: image.storagePath,
-        position: image.position,
-        is_primary: image.isPrimary,
-      })),
-    );
+  const imagesSaved = await replaceProductImages(
+    supabase,
+    productId,
+    combinedImages,
+  );
 
-    if (!imagesSaved) {
-      return {
-        success: false,
-        error: "Product was updated, but product images could not be saved",
-      };
-    }
+  if (!imagesSaved) {
+    return {
+      success: false,
+      error: "Product was updated, but product images could not be saved",
+    };
   }
 
   revalidatePath("/seller/products");

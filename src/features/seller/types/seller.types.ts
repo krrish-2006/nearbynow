@@ -17,7 +17,7 @@ export type SellerEditableProduct = Pick<
 > & {
   product_images?: Pick<
     Tables<"product_images">,
-    "id" | "image_url" | "position" | "is_primary"
+    "id" | "image_url" | "storage_path" | "position" | "is_primary"
   >[];
 };
 
