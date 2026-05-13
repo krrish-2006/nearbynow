@@ -79,7 +79,7 @@
 1. Seller opens `/seller/profile`.
 2. Profile shows account information, shop fields, AI credit balance, and pickup location fields.
 3. `updateShopCityAction` validates the current seller, updates the seller's shop city through a repository helper, and revalidates the profile page.
-4. The pickup location picker searches OpenStreetMap through the app's `/api/locations/search` route, then the seller confirms the correct location.
+4. The pickup location picker searches OpenStreetMap through the app's `/api/locations/search` route, or lets the seller click an exact pin on an embedded OpenStreetMap map.
 5. `updatePickupLocationAction` stores the protected pickup address, coordinates, pickup window, and pickup instructions.
 6. `/seller` redirects to `/seller/profile`.
 7. `/seller/settings` redirects to `/seller/profile` for old links.
