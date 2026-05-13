@@ -30,6 +30,8 @@ import { createProductAction } from "@/features/products/actions/create-product.
 
 import { updateProductAction } from "@/features/products/actions/update-product.action";
 
+import { enhanceProductImageAction } from "@/features/products/actions/enhance-product-image.action";
+
 type ProductFormProps = {
   categories: {
     id: string;
@@ -58,11 +60,17 @@ type SelectedImage = {
   id: string;
   file: File;
   previewUrl: string;
+  isEnhancing?: boolean;
+  enhancedFile?: File;
+  enhancedPreviewUrl?: string;
 };
 
 type ExistingImage = {
   id: string;
   imageUrl: string;
+  isEnhancing?: boolean;
+  enhancedFile?: File;
+  enhancedPreviewUrl?: string;
 };
 
 const MAX_CLIENT_IMAGE_BYTES = 1_200_000;
@@ -71,6 +79,104 @@ const IMAGE_COMPRESSION_QUALITY = 0.82;
 
 function getJpegFileName(fileName: string): string {
   return fileName.replace(/\.[^/.]+$/, "") + ".jpg";
+}
+
+function getPngFileName(fileName: string): string {
+  return fileName.replace(/\.[^/.]+$/, "") + ".png";
+}
+
+function dataUrlToFile(dataUrl: string, fileName: string): File {
+  const [metadata, base64] = dataUrl.split(",");
+  const mimeType =
+    metadata.match(/^data:(.*?);base64$/)?.[1] ?? "image/png";
+  const bytes = Uint8Array.from(atob(base64 ?? ""), (character) =>
+    character.charCodeAt(0),
+  );
+
+  return new File([bytes], fileName, {
+    type: mimeType,
+    lastModified: Date.now(),
+  });
+}
+
+function loadImage(src: string): Promise<HTMLImageElement> {
+  return new Promise((resolve, reject) => {
+    const image = new window.Image();
+    image.onload = () => resolve(image);
+    image.onerror = reject;
+    image.src = src;
+  });
+}
+
+async function createStudioImageFile(
+  transparentImageDataUrl: string,
+  fileName: string,
+): Promise<{
+  file: File;
+  previewUrl: string;
+}> {
+  const image = await loadImage(transparentImageDataUrl);
+  const canvas = document.createElement("canvas");
+  const size = 1200;
+  const padding = 140;
+  canvas.width = size;
+  canvas.height = size;
+
+  const context = canvas.getContext("2d");
+
+  if (!context) {
+    const file = dataUrlToFile(transparentImageDataUrl, fileName);
+
+    return {
+      file,
+      previewUrl: URL.createObjectURL(file),
+    };
+  }
+
+  const gradient = context.createLinearGradient(0, 0, 0, size);
+  gradient.addColorStop(0, "#ffffff");
+  gradient.addColorStop(1, "#f4f4f5");
+  context.fillStyle = gradient;
+  context.fillRect(0, 0, size, size);
+
+  const scale = Math.min(
+    (size - padding * 2) / image.width,
+    (size - padding * 2) / image.height,
+  );
+  const width = Math.round(image.width * scale);
+  const height = Math.round(image.height * scale);
+  const x = Math.round((size - width) / 2);
+  const y = Math.round((size - height) / 2);
+
+  context.save();
+  context.shadowColor = "rgba(0, 0, 0, 0.20)";
+  context.shadowBlur = 34;
+  context.shadowOffsetY = 24;
+  context.drawImage(image, x, y, width, height);
+  context.restore();
+
+  const blob = await new Promise<Blob | null>((resolve) => {
+    canvas.toBlob(resolve, "image/png");
+  });
+
+  if (!blob) {
+    const file = dataUrlToFile(transparentImageDataUrl, fileName);
+
+    return {
+      file,
+      previewUrl: URL.createObjectURL(file),
+    };
+  }
+
+  const file = new File([blob], fileName, {
+    type: "image/png",
+    lastModified: Date.now(),
+  });
+
+  return {
+    file,
+    previewUrl: URL.createObjectURL(file),
+  };
 }
 
 async function compressProductImage(file: File): Promise<File> {
@@ -133,9 +239,13 @@ export function ProductForm({
   const [selectedImages, setSelectedImages] = useState<SelectedImage[]>([]);
   const [imageError, setImageError] = useState<string | null>(null);
   const [isPreparingImages, setIsPreparingImages] = useState(false);
+  const existingImagesRef = useRef<ExistingImage[]>([]);
   const selectedImagesRef = useRef<SelectedImage[]>([]);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const totalImageCount = existingImages.length + selectedImages.length;
+  const isEnhancingImage =
+    existingImages.some((image) => image.isEnhancing) ||
+    selectedImages.some((image) => image.isEnhancing);
   const canAddImages =
     totalImageCount < MAX_PRODUCT_IMAGES && !isPreparingImages;
 
@@ -170,14 +280,28 @@ export function ProductForm({
   });
 
   useEffect(() => {
+    existingImagesRef.current = existingImages;
+  }, [existingImages]);
+
+  useEffect(() => {
     selectedImagesRef.current = selectedImages;
   }, [selectedImages]);
 
   useEffect(() => {
     return () => {
-      selectedImagesRef.current.forEach((image) =>
-        URL.revokeObjectURL(image.previewUrl),
-      );
+      existingImagesRef.current.forEach((image) => {
+        if (image.enhancedPreviewUrl) {
+          URL.revokeObjectURL(image.enhancedPreviewUrl);
+        }
+      });
+
+      selectedImagesRef.current.forEach((image) => {
+        URL.revokeObjectURL(image.previewUrl);
+
+        if (image.enhancedPreviewUrl) {
+          URL.revokeObjectURL(image.enhancedPreviewUrl);
+        }
+      });
     };
   }, []);
 
@@ -188,9 +312,15 @@ export function ProductForm({
   }
 
   function removeExistingImage(imageId: string) {
-    setExistingImages((images) =>
-      images.filter((image) => image.id !== imageId),
-    );
+    setExistingImages((images) => {
+      const imageToRemove = images.find((image) => image.id === imageId);
+
+      if (imageToRemove?.enhancedPreviewUrl) {
+        URL.revokeObjectURL(imageToRemove.enhancedPreviewUrl);
+      }
+
+      return images.filter((image) => image.id !== imageId);
+    });
     setImageError(null);
   }
 
@@ -200,12 +330,209 @@ export function ProductForm({
 
       if (imageToRemove) {
         URL.revokeObjectURL(imageToRemove.previewUrl);
+
+        if (imageToRemove.enhancedPreviewUrl) {
+          URL.revokeObjectURL(imageToRemove.enhancedPreviewUrl);
+        }
       }
 
       return images.filter((image) => image.id !== imageId);
     });
     setImageError(null);
     resetFileInput();
+  }
+
+  async function requestEnhancedImage(formData: FormData, fileName: string) {
+    const result = await enhanceProductImageAction(formData);
+
+    if (!result.success || !result.data) {
+      setImageError(
+        result.success ? "AI enhancement failed." : result.error,
+      );
+
+      return null;
+    }
+
+    return createStudioImageFile(
+      result.data.imageDataUrl,
+      getPngFileName(fileName),
+    );
+  }
+
+  async function enhanceExistingImage(imageId: string) {
+    const image = existingImages.find((item) => item.id === imageId);
+
+    if (!image) {
+      return;
+    }
+
+    setImageError(null);
+    setExistingImages((images) =>
+      images.map((item) =>
+        item.id === imageId ? { ...item, isEnhancing: true } : item,
+      ),
+    );
+
+    const formData = new FormData();
+    formData.append("imageUrl", image.imageUrl);
+
+    const enhancedImage = await requestEnhancedImage(
+      formData,
+      "product-ai-enhanced.png",
+    );
+
+    setExistingImages((images) =>
+      images.map((item) => {
+        if (item.id !== imageId) {
+          return item;
+        }
+
+        if (item.enhancedPreviewUrl) {
+          URL.revokeObjectURL(item.enhancedPreviewUrl);
+        }
+
+        return {
+          ...item,
+          isEnhancing: false,
+          ...(enhancedImage
+            ? {
+                enhancedFile: enhancedImage.file,
+                enhancedPreviewUrl: enhancedImage.previewUrl,
+              }
+            : {}),
+        };
+      }),
+    );
+  }
+
+  async function enhanceSelectedImage(imageId: string) {
+    const image = selectedImages.find((item) => item.id === imageId);
+
+    if (!image) {
+      return;
+    }
+
+    setImageError(null);
+    setSelectedImages((images) =>
+      images.map((item) =>
+        item.id === imageId ? { ...item, isEnhancing: true } : item,
+      ),
+    );
+
+    const formData = new FormData();
+    formData.append("image", image.file);
+
+    const enhancedImage = await requestEnhancedImage(formData, image.file.name);
+
+    setSelectedImages((images) =>
+      images.map((item) => {
+        if (item.id !== imageId) {
+          return item;
+        }
+
+        if (item.enhancedPreviewUrl) {
+          URL.revokeObjectURL(item.enhancedPreviewUrl);
+        }
+
+        return {
+          ...item,
+          isEnhancing: false,
+          ...(enhancedImage
+            ? {
+                enhancedFile: enhancedImage.file,
+                enhancedPreviewUrl: enhancedImage.previewUrl,
+              }
+            : {}),
+        };
+      }),
+    );
+  }
+
+  function discardExistingEnhancement(imageId: string) {
+    setExistingImages((images) =>
+      images.map((image) => {
+        if (image.id !== imageId) {
+          return image;
+        }
+
+        if (image.enhancedPreviewUrl) {
+          URL.revokeObjectURL(image.enhancedPreviewUrl);
+        }
+
+        return {
+          id: image.id,
+          imageUrl: image.imageUrl,
+        };
+      }),
+    );
+  }
+
+  function discardSelectedEnhancement(imageId: string) {
+    setSelectedImages((images) =>
+      images.map((image) => {
+        if (image.id !== imageId) {
+          return image;
+        }
+
+        if (image.enhancedPreviewUrl) {
+          URL.revokeObjectURL(image.enhancedPreviewUrl);
+        }
+
+        return {
+          id: image.id,
+          file: image.file,
+          previewUrl: image.previewUrl,
+        };
+      }),
+    );
+  }
+
+  function applyEnhancedExistingImage(imageId: string) {
+    const image = existingImages.find((item) => item.id === imageId);
+
+    if (!image?.enhancedFile || !image.enhancedPreviewUrl) {
+      return;
+    }
+
+    const enhancedFile = image.enhancedFile;
+    const enhancedPreviewUrl = image.enhancedPreviewUrl;
+
+    setExistingImages((images) =>
+      images.filter((item) => item.id !== imageId),
+    );
+    setSelectedImages((images) => [
+      ...images,
+      {
+        id: crypto.randomUUID(),
+        file: enhancedFile,
+        previewUrl: enhancedPreviewUrl,
+      },
+    ]);
+  }
+
+  function applyEnhancedSelectedImage(imageId: string) {
+    setSelectedImages((images) =>
+      images.map((image) => {
+        if (
+          image.id !== imageId ||
+          !image.enhancedFile ||
+          !image.enhancedPreviewUrl
+        ) {
+          return image;
+        }
+
+        const enhancedFile = image.enhancedFile;
+        const enhancedPreviewUrl = image.enhancedPreviewUrl;
+
+        URL.revokeObjectURL(image.previewUrl);
+
+        return {
+          id: image.id,
+          file: enhancedFile,
+          previewUrl: enhancedPreviewUrl,
+        };
+      }),
+    );
   }
 
   async function handleImageChange(files: FileList | null) {
@@ -257,6 +584,12 @@ export function ProductForm({
   }
 
   async function onSubmit(values: ProductSchemaValues) {
+    if (isEnhancingImage || isPreparingImages) {
+      setImageError("Wait for image processing to finish before saving.");
+
+      return;
+    }
+
     const formData = new FormData();
 
     formData.append("title", values.title);
@@ -438,6 +771,54 @@ export function ProductForm({
                         ? "Current primary image"
                         : `Current image ${index + 1}`}
                     </p>
+
+                    <div className="flex flex-wrap gap-2 px-3 pb-3">
+                      <button
+                        type="button"
+                        onClick={() => enhanceExistingImage(image.id)}
+                        disabled={image.isEnhancing || isPending}
+                        className="inline-flex h-9 items-center justify-center rounded-lg border px-3 text-xs font-semibold transition hover:bg-neutral-100 disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        {image.isEnhancing
+                          ? "Enhancing..."
+                          : "Enhance with AI"}
+                      </button>
+                    </div>
+
+                    {image.enhancedPreviewUrl && (
+                      <div className="border-t bg-white p-3">
+                        <Image
+                          src={image.enhancedPreviewUrl}
+                          alt={`AI enhanced product image ${index + 1}`}
+                          width={320}
+                          height={128}
+                          unoptimized
+                          className="mb-3 h-32 w-full rounded-lg object-cover"
+                        />
+
+                        <div className="flex flex-wrap gap-2">
+                          <button
+                            type="button"
+                            onClick={() =>
+                              applyEnhancedExistingImage(image.id)
+                            }
+                            className="inline-flex h-9 items-center justify-center rounded-lg bg-black px-3 text-xs font-semibold text-white"
+                          >
+                            Use enhanced
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() =>
+                              discardExistingEnhancement(image.id)
+                            }
+                            className="inline-flex h-9 items-center justify-center rounded-lg border px-3 text-xs font-semibold"
+                          >
+                            Keep original
+                          </button>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 ))}
 
@@ -468,6 +849,54 @@ export function ProductForm({
                     <p className="truncate px-3 py-2 text-xs font-medium text-neutral-600">
                       {image.file.name}
                     </p>
+
+                    <div className="flex flex-wrap gap-2 px-3 pb-3">
+                      <button
+                        type="button"
+                        onClick={() => enhanceSelectedImage(image.id)}
+                        disabled={image.isEnhancing || isPending}
+                        className="inline-flex h-9 items-center justify-center rounded-lg border px-3 text-xs font-semibold transition hover:bg-neutral-100 disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        {image.isEnhancing
+                          ? "Enhancing..."
+                          : "Enhance with AI"}
+                      </button>
+                    </div>
+
+                    {image.enhancedPreviewUrl && (
+                      <div className="border-t bg-white p-3">
+                        <Image
+                          src={image.enhancedPreviewUrl}
+                          alt={`AI enhanced selected image ${index + 1}`}
+                          width={320}
+                          height={128}
+                          unoptimized
+                          className="mb-3 h-32 w-full rounded-lg object-cover"
+                        />
+
+                        <div className="flex flex-wrap gap-2">
+                          <button
+                            type="button"
+                            onClick={() =>
+                              applyEnhancedSelectedImage(image.id)
+                            }
+                            className="inline-flex h-9 items-center justify-center rounded-lg bg-black px-3 text-xs font-semibold text-white"
+                          >
+                            Use enhanced
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() =>
+                              discardSelectedEnhancement(image.id)
+                            }
+                            className="inline-flex h-9 items-center justify-center rounded-lg border px-3 text-xs font-semibold"
+                          >
+                            Keep original
+                          </button>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>
@@ -526,13 +955,15 @@ export function ProductForm({
       <div className="flex flex-col gap-3 sm:flex-row">
         <button
           type="submit"
-          disabled={isPending}
+          disabled={isPending || isEnhancingImage || isPreparingImages}
           className="inline-flex h-12 items-center justify-center rounded-xl bg-black px-6 text-sm font-semibold text-white disabled:opacity-50"
         >
           {isPending
             ? mode === "edit"
               ? "Updating..."
               : "Creating..."
+            : isEnhancingImage || isPreparingImages
+              ? "Processing images..."
             : mode === "edit"
               ? "Update Product"
               : "Create Product"}
