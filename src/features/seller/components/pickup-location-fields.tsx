@@ -23,6 +23,33 @@ function formatCoordinates(latitude: number, longitude: number) {
   return `${latitude.toFixed(5)}, ${longitude.toFixed(5)}`;
 }
 
+function parseCoordinatePair(value: string) {
+  const match = value.match(/(-?\d+(?:\.\d+)?)[,\s]+(-?\d+(?:\.\d+)?)/);
+
+  if (!match) {
+    return null;
+  }
+
+  const latitude = Number(match[1]);
+  const longitude = Number(match[2]);
+
+  if (
+    !Number.isFinite(latitude) ||
+    !Number.isFinite(longitude) ||
+    latitude < -90 ||
+    latitude > 90 ||
+    longitude < -180 ||
+    longitude > 180
+  ) {
+    return null;
+  }
+
+  return {
+    latitude,
+    longitude,
+  };
+}
+
 export function PickupLocationFields({
   initialLocation,
 }: PickupLocationFieldsProps) {
@@ -46,6 +73,16 @@ export function PickupLocationFields({
           }
         : null,
     );
+  const [manualAddress, setManualAddress] = useState(
+    initialLocation?.address ?? "",
+  );
+  const [manualLatitude, setManualLatitude] = useState(
+    initialLocation ? String(Number(initialLocation.latitude)) : "",
+  );
+  const [manualLongitude, setManualLongitude] = useState(
+    initialLocation ? String(Number(initialLocation.longitude)) : "",
+  );
+  const [coordinatePaste, setCoordinatePaste] = useState("");
   const [pickupWindow, setPickupWindow] = useState(
     initialLocation?.pickup_window ?? "",
   );
@@ -93,12 +130,37 @@ export function PickupLocationFields({
   function selectResult(result: LocationSearchResult) {
     setSelectedResult(result);
     setQuery(result.name);
+    setManualAddress(result.name);
+    setManualLatitude(String(result.latitude));
+    setManualLongitude(String(result.longitude));
     setResults([]);
+  }
+
+  function applyPastedCoordinates() {
+    const parsed = parseCoordinatePair(coordinatePaste);
+
+    if (!parsed) {
+      toast.error("Paste coordinates like 23.5204, 87.3119");
+      return;
+    }
+
+    setManualLatitude(String(parsed.latitude));
+    setManualLongitude(String(parsed.longitude));
+    setSelectedResult(null);
+    toast.success("Exact point added");
   }
 
   function cancelEdit() {
     setIsEditing(!savedLocation);
     setQuery(savedLocation?.address ?? "");
+    setManualAddress(savedLocation?.address ?? "");
+    setManualLatitude(
+      savedLocation ? String(Number(savedLocation.latitude)) : "",
+    );
+    setManualLongitude(
+      savedLocation ? String(Number(savedLocation.longitude)) : "",
+    );
+    setCoordinatePaste("");
     setPickupWindow(savedLocation?.pickup_window ?? "");
     setPickupInstructions(savedLocation?.pickup_instructions ?? "");
     setSelectedResult(
@@ -116,17 +178,33 @@ export function PickupLocationFields({
   }
 
   function saveLocation() {
-    if (!selectedResult) {
-      toast.error("Select a pickup location first");
+    const latitude = Number(manualLatitude);
+    const longitude = Number(manualLongitude);
+    const address = manualAddress.trim();
+
+    if (address.length < 5) {
+      toast.error("Enter the pickup address");
+      return;
+    }
+
+    if (
+      !Number.isFinite(latitude) ||
+      latitude < -90 ||
+      latitude > 90 ||
+      !Number.isFinite(longitude) ||
+      longitude < -180 ||
+      longitude > 180
+    ) {
+      toast.error("Enter valid latitude and longitude");
       return;
     }
 
     const formData = new FormData();
-    formData.set("address", selectedResult.name);
-    formData.set("latitude", String(selectedResult.latitude));
-    formData.set("longitude", String(selectedResult.longitude));
-    formData.set("osm_place_id", selectedResult.placeId ?? "");
-    formData.set("osm_display_name", selectedResult.displayName);
+    formData.set("address", address);
+    formData.set("latitude", String(latitude));
+    formData.set("longitude", String(longitude));
+    formData.set("osm_place_id", selectedResult?.placeId ?? "");
+    formData.set("osm_display_name", selectedResult?.displayName ?? "");
     formData.set("pickup_window", pickupWindow.trim());
     formData.set("pickup_instructions", pickupInstructions.trim());
 
@@ -140,11 +218,11 @@ export function PickupLocationFields({
 
       setSavedLocation({
         shop_id: savedLocation?.shop_id ?? "",
-        address: selectedResult.name,
-        latitude: selectedResult.latitude,
-        longitude: selectedResult.longitude,
-        osm_place_id: selectedResult.placeId,
-        osm_display_name: selectedResult.displayName,
+        address,
+        latitude,
+        longitude,
+        osm_place_id: selectedResult?.placeId ?? null,
+        osm_display_name: selectedResult?.displayName ?? null,
         pickup_window: pickupWindow.trim() || null,
         pickup_instructions: pickupInstructions.trim() || null,
         confirmed_at: new Date().toISOString(),
@@ -241,6 +319,76 @@ export function PickupLocationFields({
             </div>
           )}
 
+          <div className="rounded-2xl border bg-white p-4">
+            <p className="text-sm font-bold">Manual exact point</p>
+            <p className="mt-1 text-xs text-neutral-500">
+              Use this when search cannot find your exact shop/building.
+            </p>
+
+            <input
+              value={manualAddress}
+              onChange={(event) => {
+                setManualAddress(event.target.value);
+                setSelectedResult(null);
+              }}
+              placeholder="Exact pickup address"
+              className="mt-3 h-11 w-full rounded-2xl border bg-white px-4 text-sm font-medium shadow-sm outline-none transition focus:ring-2 focus:ring-black"
+            />
+
+            <div className="mt-3 grid gap-3 sm:grid-cols-2">
+              <input
+                value={manualLatitude}
+                onChange={(event) => {
+                  setManualLatitude(event.target.value);
+                  setSelectedResult(null);
+                }}
+                inputMode="decimal"
+                placeholder="Latitude"
+                className="h-11 rounded-2xl border bg-white px-4 text-sm font-medium shadow-sm outline-none transition focus:ring-2 focus:ring-black"
+              />
+
+              <input
+                value={manualLongitude}
+                onChange={(event) => {
+                  setManualLongitude(event.target.value);
+                  setSelectedResult(null);
+                }}
+                inputMode="decimal"
+                placeholder="Longitude"
+                className="h-11 rounded-2xl border bg-white px-4 text-sm font-medium shadow-sm outline-none transition focus:ring-2 focus:ring-black"
+              />
+            </div>
+
+            <div className="mt-3 flex flex-col gap-2 sm:flex-row">
+              <input
+                value={coordinatePaste}
+                onChange={(event) => setCoordinatePaste(event.target.value)}
+                placeholder="Paste coordinates, e.g. 23.5204, 87.3119"
+                className="h-11 flex-1 rounded-2xl border bg-white px-4 text-sm font-medium shadow-sm outline-none transition focus:ring-2 focus:ring-black"
+              />
+
+              <button
+                type="button"
+                onClick={applyPastedCoordinates}
+                className="h-11 rounded-xl border px-4 text-sm font-semibold transition hover:bg-neutral-100"
+              >
+                Use Point
+              </button>
+            </div>
+
+            {Number.isFinite(Number(manualLatitude)) &&
+              Number.isFinite(Number(manualLongitude)) && (
+                <a
+                  href={`https://www.openstreetmap.org/?mlat=${manualLatitude}&mlon=${manualLongitude}#map=18/${manualLatitude}/${manualLongitude}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="mt-3 inline-flex text-sm font-semibold underline"
+                >
+                  Preview manual point
+                </a>
+              )}
+          </div>
+
           <input
             value={pickupWindow}
             onChange={(event) => setPickupWindow(event.target.value)}
@@ -259,7 +407,12 @@ export function PickupLocationFields({
           <div className="flex justify-end gap-2">
             <button
               type="button"
-              disabled={isPending || !selectedResult}
+              disabled={
+                isPending ||
+                manualAddress.trim().length < 5 ||
+                !Number.isFinite(Number(manualLatitude)) ||
+                !Number.isFinite(Number(manualLongitude))
+              }
               onClick={saveLocation}
               className="h-10 rounded-xl bg-black px-4 text-sm font-semibold text-white disabled:opacity-50"
             >
