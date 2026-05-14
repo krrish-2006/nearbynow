@@ -2,6 +2,9 @@
 
 NearbyNow is a local marketplace app where buyers discover products from nearby shops and sellers manage their shop listings. The current MVP focuses on Durgapur, with other cities shown as coming soon.
 
+## Live Demo
+https://www.nearbynow.store
+
 ## Tech Stack
 
 - Next.js App Router
