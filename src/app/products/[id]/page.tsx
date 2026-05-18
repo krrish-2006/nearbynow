@@ -9,6 +9,9 @@ import {
   getProductDetails,
   getRelatedProducts,
 } from "@/repositories/product.repository";
+import {
+  getPublicProductPickupLocationByProductId,
+} from "@/repositories/pickup-location.repository";
 import { getWishlistItemId } from "@/repositories/wishlist.repository";
 
 import BuyNowButton from "@/features/checkout/components/buy-now-button";
@@ -51,6 +54,10 @@ export default async function ProductDetailsPage({
   );
 
   const relatedProducts = await getRelatedProducts(supabase, product);
+  const pickupLocation = await getPublicProductPickupLocationByProductId(
+    supabase,
+    product.id,
+  );
   const productImages = [...(product.product_images ?? [])]
     .sort((first, second) => first.position - second.position)
     .map((image) => image.image_url);
@@ -60,6 +67,9 @@ export default async function ProductDetailsPage({
       : product.image_url
         ? [product.image_url]
         : [];
+  const googleMapsUrl = pickupLocation
+    ? `https://www.google.com/maps?q=${pickupLocation.latitude},${pickupLocation.longitude}`
+    : null;
 
   return (
     <main className="min-h-screen bg-neutral-100">
@@ -112,6 +122,18 @@ export default async function ProductDetailsPage({
                   <h2 className="mt-1 text-xl font-bold">
                     {product.shops?.name ?? "Local shop"}
                   </h2>
+
+                  {googleMapsUrl && (
+                    <a
+                      href={googleMapsUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="mt-2 inline-flex text-sm font-semibold text-neutral-700 underline underline-offset-4 hover:text-black"
+                      title={pickupLocation?.address}
+                    >
+                      View shop location on Google Maps
+                    </a>
+                  )}
                   </div>
 
                   <WishlistButton

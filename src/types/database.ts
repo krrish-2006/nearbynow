@@ -753,6 +753,16 @@ export type Database = {
           pickup_instructions: string | null
         }[]
       }
+      get_public_product_pickup_location: {
+        Args: {
+          p_product_id: string
+        }
+        Returns: {
+          address: string
+          latitude: number
+          longitude: number
+        }[]
+      }
       set_order_item_fulfillment_defaults: {
         Args: Record<PropertyKey, never>
         Returns: unknown

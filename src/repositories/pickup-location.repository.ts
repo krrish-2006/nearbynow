@@ -4,6 +4,11 @@ import type { Database, Tables } from "@/types/database";
 
 export type ShopPickupLocation = Tables<"shop_pickup_locations">;
 
+export type PublicProductPickupLocation = Pick<
+  ShopPickupLocation,
+  "address" | "latitude" | "longitude"
+>;
+
 export type ShopPickupLocationInput = Pick<
   Database["public"]["Tables"]["shop_pickup_locations"]["Insert"],
   | "shop_id"
@@ -31,6 +36,24 @@ export async function getPickupLocationByShopId(
   }
 
   return data;
+}
+
+export async function getPublicProductPickupLocationByProductId(
+  supabase: SupabaseClient<Database>,
+  productId: string,
+): Promise<PublicProductPickupLocation | null> {
+  const { data, error } = await supabase.rpc(
+    "get_public_product_pickup_location",
+    {
+      p_product_id: productId,
+    },
+  );
+
+  if (error || !data?.[0]) {
+    return null;
+  }
+
+  return data[0];
 }
 
 export async function upsertPickupLocation(
